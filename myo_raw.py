@@ -2,7 +2,10 @@
     Original by dzhu
         https://github.com/dzhu/myo-raw
 
-    Edited by Minh Nguyen
+    Edited by Fernando Cosentino
+        http://www.fernandocosentino.net/pyoconnect
+        
+    Modified for thesis implementation by Minh Nguyen
         https://github.com/Kenfin2017/myo_mqtt
 '''
 
