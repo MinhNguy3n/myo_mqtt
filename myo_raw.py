@@ -1,12 +1,9 @@
 '''
-    Original by dzhu
-        https://github.com/dzhu/myo-raw
+	Original by dzhu
+		https://github.com/dzhu/myo-raw
 
-    Edited by Fernando Cosentino
-        http://www.fernandocosentino.net/pyoconnect
-        
-    Modified for thesis implementation by Minh Nguyen
-        https://github.com/Kenfin2017/myo_mqtt
+	Edited by Fernando Cosentino
+		http://www.fernandocosentino.net/pyoconnect
 '''
 
 
@@ -23,7 +20,6 @@ import serial
 from serial.tools.list_ports import comports
 
 from common import *
-
 
 def multichr(ords):
     if sys.version_info[0] >= 3:
@@ -53,8 +49,8 @@ class Pose(enum.Enum):
     WAVE_IN = 2
     WAVE_OUT = 3
     FINGERS_SPREAD = 4
-    DOUBLE_TAP = 5
-    UNKNOWN = 255    
+    THUMB_TO_PINKY = 5
+    UNKNOWN = 255	 
     
 class Packet(object):
     def __init__(self, ords):
@@ -82,8 +78,7 @@ class BT(object):
         t0 = time.time()
         self.ser.timeout = None
         while timeout is None or time.time() < t0 + timeout:
-            if timeout is not None: 
-                self.ser.timeout = t0 + timeout - time.time()
+            if timeout is not None: self.ser.timeout = t0 + timeout - time.time()
             c = self.ser.read()
             if not c: return None
 
@@ -98,8 +93,7 @@ class BT(object):
         t0 = time.time()
         while time.time() < t0 + timeout:
             p = self.recv_packet(t0 + timeout - time.time())
-            if not p: 
-                return res
+            if not p: return res
             res.append(p)
         return res
 
@@ -423,24 +417,8 @@ if __name__ == '__main__':
     if HAVE_PYGAME:
         w, h = 1200, 400
         scr = pygame.display.set_mode((w, h))
-    import paho.mqtt.client as mqtt
-    global MESSAGE
-    global client
-    global broker_url
-    global broker_port
-    global arm_alt
-    # udp server dependencies
-    # global UDP_IP
-    # global UDP_PORT
 
-    #remote esp node ip addr and udp port
-    # UDP_IP = "192.168.0.106"
-    # UDP_PORT = 4210
-    MESSAGE = ""
-    broker_url = "localhost"
-    broker_port = 1883
     last_vals = None
-    arm_alt = "mid"
     def plot(scr, vals):
         DRAW_LINES = False
 
@@ -462,18 +440,12 @@ if __name__ == '__main__':
                                  (w, int(h/8 * (i+1))))
             else:
                 c = int(255 * max(0, min(1, v)))
-                scr.fill((c, c, c), (w - D, i * h / 8, D, (i + 1) * h / 8 -       i * h / 8));
+                scr.fill((c, c, c), (w - D, i * h / 8, D, (i + 1) * h / 8 - i * h / 8));
 
         pygame.display.flip()
         last_vals = vals
 
     m = MyoRaw(sys.argv[1] if len(sys.argv) >= 2 else None)
-
-    def on_connect(client, userdata, flags, rc):
-        print("Connected with result code: {}".format(rc))
-
-    def on_disconnect(client, userdata, rc):
-        print("Client got disconnected")
 
     def proc_emg(emg, moving, times=[]):
         if HAVE_PYGAME:
@@ -481,105 +453,35 @@ if __name__ == '__main__':
             plot(scr, [e / 2000. for e in emg])
         else:
             print(emg)
+
         ## print framerate of received data
         times.append(time.time())
         if len(times) > 20:
             #print((len(times) - 1) / (times[-1] - times[0]))
             times.pop(0)
 
-    def proc_imu(quat, acc, gyro, times=[]):
-        global client
-        global arm_alt
-        x = acc[0]
-        y = acc[1]
-        z = acc[2]
-        #print("acc=({0},{1},{2})".format(x,y,z))
-        #print("gyro=({0},{1},{2})".format(gyro[0],gyro[1],gyro[2]))
-        #print("quat=({0},{1},{2},{3})".format(quat[0],quat[1],quat[2], quat[3]))
-        times.append(time.time())
-        if len(times) > 20:
-        #     print((len(times) - 1) / (times[-1] - times[0]))
-            times.pop(0)
-
-        if(x*z < 0 and x < -1500):
-            arm_alt = "high"
-        elif(x*z > 0 and x > 1500):
-            arm_alt = "low"
-        else:
-            arm_alt = "mid"
-
-    def on_connect(client, userdata, flags, rc):
-        print("Connected With Result Code: {}".format(rc))
-
-    def on_disconnect(client, userdata, rc):
-        global broker_port
-        global broker_url
-        if rc != 0:
-            print("Unexpected disconnection.")
-        print("Trying to reconnect ...")
-        client.reconnect()
-
-    def on_log(mqttc, obj, level, string):
-        print(string)
-
-    def proc_pose(myo_pose):
-        global MESSAGE
-        global client
-        global arm_alt
-        MESSAGE = myo_pose.name
-        print("message:", MESSAGE)
-        ### send to udp server 
-        #sock.sendto(MESSAGE.encode(), (UDP_IP, UDP_PORT))
-
-        ### Send a single message to topic /Myo/pose of MQTT broker
-        if MESSAGE == "REST" or MESSAGE == "DOUBLE_TAP":
-            client.publish(topic="/Myo/pose", payload=MESSAGE, qos=1, retain=False)
-
-        if arm_alt == "mid":
-            if MESSAGE == "WAVE_OUT":
-                client.publish(topic="/Myo/pose", payload="ROTATE_CCW", qos=1, retain=False)
-            elif MESSAGE == "WAVE_IN":
-                client.publish(topic="/Myo/pose", payload="ROTATE_CW", qos=1, retain=False)
-            elif MESSAGE == "FINGERS_SPREAD":
-                client.publish(topic="/Myo/pose", payload="STRETCH", qos=1, retain=False)
-            elif MESSAGE == "FIST":
-                client.publish(topic="/Myo/pose", payload="SHORTEN", qos=1, retain=False)
-        elif arm_alt == "high" and MESSAGE == "FIST":
-            client.publish(topic="/Myo/pose", payload="RAISE", qos=1, retain=False)
-        elif arm_alt == "low" and MESSAGE == "FIST":
-            client.publish(topic="/Myo/pose", payload="LOWER", qos=1, retain=False)
-        else:
-            pass
-
-    m.add_imu_handler(proc_imu)
-    #m.add_emg_handler(proc_emg)
-    m.add_pose_handler(proc_pose)
+    m.add_emg_handler(proc_emg)
     m.connect()
 
     m.add_arm_handler(lambda arm, xdir: print('arm', arm, 'xdir', xdir))
+    m.add_pose_handler(lambda p: print('pose', p))
 
     try:
-        ### MQTT broker for HomeAssistant Mosquitto add-on
-
-        client = mqtt.Client()
-        client.on_connect = on_connect
-        client.on_disconnect = on_disconnect
-        client.on_log = on_log
-        client.username_pw_set("myo", password="Myoband")
-        client.connect(broker_url, broker_port)
-
-        client.subscribe("/Myo/pose", qos=1)
-        # the following function implement threaded interface to network, which create a loop in background. 
-        # this call also handles reconnecting to the broker 
-        client.loop_start()
         while True:
             m.run(1)
+
+            if HAVE_PYGAME:
+                for ev in pygame.event.get():
+                    if ev.type == QUIT or (ev.type == KEYDOWN and ev.unicode == 'q'):
+                        raise KeyboardInterrupt()
+                    elif ev.type == KEYDOWN:
+                        if K_1 <= ev.key <= K_3:
+                            m.vibrate(ev.key - K_0)
+                        if K_KP1 <= ev.key <= K_KP3:
+                            m.vibrate(ev.key - K_KP0)
+
     except KeyboardInterrupt:
         pass
     finally:
         m.disconnect()
         print()
-        #stop background thread and disconnect from broker
-        client.loop_stop(force=False)
-        client.unsubscribe("/Myo/pose")
-        client.disconnect()
