@@ -53,7 +53,7 @@ def onUnlock():
     client = mqtt.Client()
     client.on_connect = on_connect
     client.on_disconnect = on_disconnect
-    client.on_log = on_log
+    #client.on_log = on_log
     client.username_pw_set("myo", password="Myoband")
     client.connect(broker_url, broker_port)
     client.subscribe("/Myo/pose", qos=1)
@@ -92,7 +92,7 @@ def onPoseEdge(pose, edge):
         arm_alt = "low"
     else:
         arm_alt = "mid"
-    print("Arm levitation: "+arm_alt)
+    #print("Arm levitation: "+arm_alt)
     if edge == "on":
         if MESSAGE == "rest":
             client.publish(topic="/Myo/pose", payload="REST", qos=1, retain=False)

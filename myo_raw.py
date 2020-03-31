@@ -19,19 +19,19 @@ import time
 import serial
 from serial.tools.list_ports import comports
 
-from common import *
+from common import pack, unpack, multiord
 
-def multichr(ords):
-    if sys.version_info[0] >= 3:
-        return bytes(ords)
-    else:
-        return ''.join(map(chr, ords))
+# def multichr(ords):
+    # if sys.version_info[0] >= 3:
+        # return bytes(ords)
+    # else:
+        # return ''.join(map(chr, ords))
 
-def multiord(b):
-    if sys.version_info[0] >= 3:
-        return list(b)
-    else:
-        return map(ord, b)
+# def multiord(b):
+    # if sys.version_info[0] >= 3:
+        # return list(b)
+    # else:
+        # return map(ord, b)
 
 class Arm(enum.Enum):
     UNKNOWN = 0
@@ -296,8 +296,18 @@ class MyoRaw(object):
                 gyro = vals[7:10]
                 self.on_imu(quat, acc, gyro)
             elif attr == 0x23:
-                typ, val, xdir, _,_,_ = unpack('6B', pay)
-
+                if len(pay) == 6:
+                    try:
+                        typ, val, xdir, _, _, _ = unpack('6B', pay)
+                    except Exception as e:
+                        print("Got exception: " + str(e) + "\nContinuing...")
+                        return
+                elif len(pay) == 3:
+                    try:
+                        typ, val, xdir = unpack('3B', pay)
+                    except Exception as e:
+                        print("Got exception: " + str(e) + "\nContinuing...")
+                        return
                 if typ == 1: # on arm
                     self.on_arm(Arm(val), XDirection(xdir))
                 elif typ == 2: # removed from arm
